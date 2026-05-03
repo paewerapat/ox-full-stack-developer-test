@@ -5,6 +5,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { GameModule } from './game/game.module';
+import { ScoresModule } from './scores/scores.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -22,6 +24,8 @@ import configuration from './config/configuration';
     }),
     AuthModule,
     UsersModule,
+    GameModule,
+    ScoresModule,
   ],
   controllers: [AppController],
   providers: [AppService],
