@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"e:\\\\Assaignment\\\\ox-full-stack-developer-test\\\\front-end\\\\node_modules\\\\next\\\\dist\\\\docs\\\\\" -Force)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
