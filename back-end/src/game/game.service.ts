@@ -10,6 +10,8 @@ const WIN_LINES = [
   [0, 4, 8], [2, 4, 6],
 ];
 
+export type Difficulty = 'medium' | 'boss';
+
 export interface MoveResult {
   gameId: string;
   board: Cell[];
@@ -29,7 +31,10 @@ export class GameService {
     private usersService: UsersService,
   ) {}
 
-  async createGame(userId: string): Promise<{ gameId: string; board: Cell[]; status: GameStatus }> {
+  async createGame(
+    userId: string,
+    difficulty: Difficulty = 'medium',
+  ): Promise<{ gameId: string; board: Cell[]; status: GameStatus; difficulty: Difficulty }> {
     await this.gameModel.updateMany(
       { userId: new Types.ObjectId(userId), status: 'playing' },
       { status: 'draw' },
@@ -39,9 +44,15 @@ export class GameService {
       userId: new Types.ObjectId(userId),
       board: Array(9).fill(null),
       status: 'playing',
+      difficulty,
     });
 
-    return { gameId: (game._id as object).toString(), board: game.board, status: game.status };
+    return {
+      gameId: (game._id as object).toString(),
+      board: game.board,
+      status: game.status,
+      difficulty: game.difficulty,
+    };
   }
 
   async makeMove(gameId: string, userId: string, position: number): Promise<MoveResult> {
@@ -66,7 +77,10 @@ export class GameService {
     } else if (board.every((c) => c !== null)) {
       status = 'draw';
     } else {
-      botMove = this.getBotMove(board);
+      botMove = game.difficulty === 'boss'
+        ? this.getBossMove(board)
+        : this.getMediumMove(board);
+
       board[botMove] = 'O';
       const botWinLine = this.getWinLine(board, 'O');
 
@@ -108,6 +122,52 @@ export class GameService {
     };
   }
 
+  // Medium: win if possible → block player → random
+  // Player can win using fork strategy
+  private getMediumMove(board: Cell[]): number {
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = 'O';
+        const wins = !!this.getWinLine(board, 'O');
+        board[i] = null;
+        if (wins) return i;
+      }
+    }
+
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = 'X';
+        const blocks = !!this.getWinLine(board, 'X');
+        board[i] = null;
+        if (blocks) return i;
+      }
+    }
+
+    const empty = board.reduce<number[]>((acc, c, i) => {
+      if (c === null) acc.push(i);
+      return acc;
+    }, []);
+    return empty[Math.floor(Math.random() * empty.length)];
+  }
+
+  // Boss: full Minimax — unbeatable
+  private getBossMove(board: Cell[]): number {
+    let bestVal = -Infinity;
+    let bestMove = 0;
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = 'O';
+        const val = this.minimax(board, false, 0);
+        board[i] = null;
+        if (val > bestVal) {
+          bestVal = val;
+          bestMove = i;
+        }
+      }
+    }
+    return bestMove;
+  }
+
   private getWinLine(board: Cell[], symbol: 'X' | 'O'): number[] | null {
     for (const line of WIN_LINES) {
       const [a, b, c] = line;
@@ -144,22 +204,5 @@ export class GameService {
       }
       return best;
     }
-  }
-
-  private getBotMove(board: Cell[]): number {
-    let bestVal = -Infinity;
-    let bestMove = 0;
-    for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'O';
-        const val = this.minimax(board, false, 0);
-        board[i] = null;
-        if (val > bestVal) {
-          bestVal = val;
-          bestMove = i;
-        }
-      }
-    }
-    return bestMove;
   }
 }

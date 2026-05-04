@@ -15,6 +15,9 @@ export class Game {
 
   @Prop({ enum: ['playing', 'win', 'lose', 'draw'], default: 'playing' })
   status: GameStatus;
+
+  @Prop({ enum: ['medium', 'boss'], default: 'medium' })
+  difficulty: 'medium' | 'boss';
 }
 
 export const GameSchema = SchemaFactory.createForClass(Game);

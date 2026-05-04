@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { fetchProfile, removeToken, UserProfile } from '../lib/auth';
-import { startGame, makeMove, Cell, GameStatus } from '../lib/game';
+import { startGame, makeMove, Cell, GameStatus, Difficulty } from '../lib/game';
 import Board from '../components/Board';
 
 interface GameState {
@@ -13,7 +13,25 @@ interface GameState {
   status: GameStatus;
   winLine: number[] | null;
   lastBotMove: number | null;
+  difficulty: Difficulty;
 }
+
+const DIFFICULTY_CONFIG = {
+  medium: {
+    label: 'ปานกลาง',
+    badge: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+    btn: 'bg-orange-500 text-white',
+    btnIdle: 'bg-gray-800 text-gray-400 hover:bg-gray-700',
+    description: 'บอทโจมตีและบล็อคเท่านั้น',
+  },
+  boss: {
+    label: '☠️ บอส',
+    badge: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+    btn: 'bg-rose-600 text-white',
+    btnIdle: 'bg-gray-800 text-gray-400 hover:bg-gray-700',
+    description: 'บอทเล่น Minimax สมบูรณ์แบบ',
+  },
+} satisfies Record<Difficulty, { label: string; badge: string; btn: string; btnIdle: string; description: string }>;
 
 export default function HomePage() {
   const router = useRouter();
@@ -21,6 +39,7 @@ export default function HomePage() {
   const [game, setGame] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(true);
   const [moving, setMoving] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [scoreChange, setScoreChange] = useState<{ value: number; bonus: boolean } | null>(null);
 
   useEffect(() => {
@@ -34,15 +53,23 @@ export default function HomePage() {
     });
   }, [router]);
 
-  const handleNewGame = useCallback(async () => {
+  const handleNewGame = useCallback(async (diff: Difficulty) => {
     setScoreChange(null);
-    const res = await startGame();
-    setGame({ gameId: res.gameId, board: res.board, status: 'playing', winLine: null, lastBotMove: null });
+    const res = await startGame(diff);
+    setGame({
+      gameId: res.gameId,
+      board: res.board,
+      status: 'playing',
+      winLine: null,
+      lastBotMove: null,
+      difficulty: res.difficulty,
+    });
   }, []);
 
   useEffect(() => {
-    if (!loading && user) handleNewGame();
-  }, [loading, user, handleNewGame]);
+    if (!loading && user) handleNewGame(difficulty);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user]);
 
   const handleCellClick = async (position: number) => {
     if (!game || game.status !== 'playing' || moving) return;
@@ -50,13 +77,13 @@ export default function HomePage() {
 
     const res = await makeMove(game.gameId, position);
 
-    setGame({
-      gameId: res.gameId,
+    setGame((prev) => prev ? {
+      ...prev,
       board: res.board,
       status: res.status,
       winLine: res.winLine,
       lastBotMove: res.botMove,
-    });
+    } : prev);
 
     if (res.status !== 'playing') {
       setUser((prev) => prev ? { ...prev, score: res.score, consecutiveWins: res.consecutiveWins } : prev);
@@ -81,11 +108,14 @@ export default function HomePage() {
     );
   }
 
+  const isPlaying = game?.status === 'playing';
+  const cfg = DIFFICULTY_CONFIG[game?.difficulty ?? difficulty];
+
   const statusMessage: Record<GameStatus, string> = {
-    playing: moving ? "Bot is thinking..." : "Your turn (X)",
-    win: '🎉 You Win!',
-    lose: '😞 Bot Wins!',
-    draw: '🤝 Draw!',
+    playing: moving ? 'บอทกำลังคิด...' : 'ตาคุณ (X)',
+    win: '🎉 คุณชนะ!',
+    lose: '😞 บอทชนะ!',
+    draw: '🤝 เสมอ!',
   };
 
   const statusColor: Record<GameStatus, string> = {
@@ -96,7 +126,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center py-8 px-4 gap-6">
+    <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center py-8 px-4 gap-5">
 
       {/* Header */}
       <div className="w-full max-w-md flex items-center justify-between">
@@ -109,7 +139,7 @@ export default function HomePage() {
             Leaderboard
           </Link>
           <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-400 transition-colors">
-            Sign out
+            ออกจากระบบ
           </button>
         </div>
       </div>
@@ -133,13 +163,47 @@ export default function HomePage() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-400">Score</p>
+            <p className="text-xs text-gray-400">คะแนน</p>
           </div>
           <div className="text-center">
             <p className="text-xl font-bold text-yellow-400">{user?.consecutiveWins}</p>
             <p className="text-xs text-gray-400">Streak</p>
           </div>
         </div>
+      </div>
+
+      {/* Difficulty selector */}
+      <div className="w-full max-w-md">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 mr-1">ระดับความยาก:</span>
+          {(['medium', 'boss'] as Difficulty[]).map((d) => {
+            const c = DIFFICULTY_CONFIG[d];
+            const active = (isPlaying ? game?.difficulty : difficulty) === d;
+            return (
+              <button
+                key={d}
+                onClick={() => !isPlaying && setDifficulty(d)}
+                disabled={isPlaying}
+                title={isPlaying ? 'เริ่มเกมใหม่เพื่อเปลี่ยนระดับ' : c.description}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  active ? `${c.btn} border-transparent` : `${c.btnIdle} border-gray-700`
+                } ${isPlaying ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+          {game && (
+            <span className={`ml-auto text-xs px-2 py-1 rounded-md border ${cfg.badge}`}>
+              {cfg.label}
+            </span>
+          )}
+        </div>
+        {!isPlaying && (
+          <p className="text-xs text-gray-600 mt-1 ml-1">
+            {DIFFICULTY_CONFIG[difficulty].description}
+          </p>
+        )}
       </div>
 
       {/* Status */}
@@ -164,17 +228,17 @@ export default function HomePage() {
 
       {/* Legend */}
       <div className="flex gap-6 text-sm text-gray-500">
-        <span><span className="text-blue-400 font-bold">X</span> = You</span>
-        <span><span className="text-rose-400 font-bold">O</span> = Bot</span>
+        <span><span className="text-blue-400 font-bold">X</span> = คุณ</span>
+        <span><span className="text-rose-400 font-bold">O</span> = บอท</span>
       </div>
 
-      {/* New game button */}
+      {/* Play Again */}
       {game?.status !== 'playing' && (
         <button
-          onClick={handleNewGame}
-          className="mt-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors"
+          onClick={() => handleNewGame(difficulty)}
+          className="mt-1 px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-colors"
         >
-          Play Again
+          เล่นอีกครั้ง
         </button>
       )}
     </main>

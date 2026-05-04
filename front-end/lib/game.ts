@@ -4,11 +4,13 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 
 export type Cell = 'X' | 'O' | null;
 export type GameStatus = 'playing' | 'win' | 'lose' | 'draw';
+export type Difficulty = 'medium' | 'boss';
 
 export interface NewGameResponse {
   gameId: string;
   board: Cell[];
   status: GameStatus;
+  difficulty: Difficulty;
 }
 
 export interface MoveResponse {
@@ -30,10 +32,11 @@ function authHeaders() {
   };
 }
 
-export async function startGame(): Promise<NewGameResponse> {
+export async function startGame(difficulty: Difficulty = 'medium'): Promise<NewGameResponse> {
   const res = await fetch(`${API}/game`, {
     method: 'POST',
     headers: authHeaders(),
+    body: JSON.stringify({ difficulty }),
   });
   if (!res.ok) throw new Error('Failed to start game');
   return res.json() as Promise<NewGameResponse>;
