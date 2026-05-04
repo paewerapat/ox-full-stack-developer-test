@@ -122,9 +122,20 @@ export class GameService {
     };
   }
 
-  // Medium: win if possible → block player → random
-  // Player can win using fork strategy
+  // Medium: 35% pure random → win if possible → block → random
+  // Bot makes mistakes often enough that player can win with basic moves
   private getMediumMove(board: Cell[]): number {
+    const empty = board.reduce<number[]>((acc, c, i) => {
+      if (c === null) acc.push(i);
+      return acc;
+    }, []);
+
+    // 35% chance: skip all logic and play random
+    if (Math.random() < 0.35) {
+      return empty[Math.floor(Math.random() * empty.length)];
+    }
+
+    // Take winning move
     for (let i = 0; i < 9; i++) {
       if (!board[i]) {
         board[i] = 'O';
@@ -134,19 +145,18 @@ export class GameService {
       }
     }
 
-    for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'X';
-        const blocks = !!this.getWinLine(board, 'X');
-        board[i] = null;
-        if (blocks) return i;
+    // Block player (only 70% of remaining cases — still makes mistakes)
+    if (Math.random() < 0.70) {
+      for (let i = 0; i < 9; i++) {
+        if (!board[i]) {
+          board[i] = 'X';
+          const blocks = !!this.getWinLine(board, 'X');
+          board[i] = null;
+          if (blocks) return i;
+        }
       }
     }
 
-    const empty = board.reduce<number[]>((acc, c, i) => {
-      if (c === null) acc.push(i);
-      return acc;
-    }, []);
     return empty[Math.floor(Math.random() * empty.length)];
   }
 
